@@ -1,4 +1,6 @@
-# 🇮🇱 🇺🇸 vs 🇮🇷 — Israel / USA vs Iran War Monitor 2026
+# Israel / USA vs Iran — War Monitor 2026
+
+![ISR](https://flagcdn.com/w40/il.png) ![USA](https://flagcdn.com/w40/us.png) **vs** ![IRN](https://flagcdn.com/w40/ir.png)
 
 > **Real-time OSINT war room dashboard** tracking **Operation Ultimatum** — the Israel/USA vs Iran conflict that began on **28 February 2026**. Built as a permanent historical archive: when the war ends, this site stays online with final statistics, achieved objectives, and a complete conflict record.
 
