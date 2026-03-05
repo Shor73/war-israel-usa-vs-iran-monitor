@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import Parser from 'rss-parser'
 import { RSS_FEEDS } from '@/lib/feeds'
 import type { NewsItem } from '@/lib/types'
+import { rateLimit, sanitizeUrl, stripHtml } from '@/lib/rate-limit'
+
+const VALID_CATEGORIES = new Set(['ALL', 'WIRE', 'WESTERN', 'ISRAELI', 'IRANIAN', 'ARAB', 'DEFENSE', 'FINANCIAL', 'OSINT'])
+const MAX_FEED_SIZE = 5 * 1024 * 1024 // 5 MB per feed — prevents memory exhaustion
 
 const parser = new Parser({
   timeout: 8000,
@@ -45,17 +49,43 @@ function isBreaking(title: string): boolean {
 
 async function fetchFeed(feed: typeof RSS_FEEDS[0]): Promise<NewsItem[]> {
   try {
-    const parsed = await parser.parseURL(feed.url)
+    // Size-limited fetch to prevent memory exhaustion from malicious RSS servers
+    const controller = new AbortController()
+    const res = await fetch(feed.url, {
+      signal: AbortSignal.any([AbortSignal.timeout(8000), controller.signal]),
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1)',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+      },
+    })
+    if (!res.ok || !res.body) return []
+
+    // Check Content-Length — reject oversized feeds immediately
+    const cl = res.headers.get('content-length')
+    if (cl && parseInt(cl) > MAX_FEED_SIZE) return []
+
+    // Stream with hard size cap
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      if (buffer.length > MAX_FEED_SIZE) { controller.abort(); reader.cancel(); return [] }
+    }
+
+    const parsed = await parser.parseString(buffer)
     return (parsed.items || []).slice(0, 5).map((item, idx) => ({
       id: `${feed.name}-${idx}-${Date.now()}`,
-      title: item.title || 'Untitled',
-      link: item.link || '#',
+      title: stripHtml(item.title) || 'Untitled',           // strip HTML tags
+      link: sanitizeUrl(item.link),                          // block javascript: URIs
       pubDate: item.pubDate || new Date().toISOString(),
       source: feed.name,
       category: feed.category,
-      isBreaking: isBreaking(item.title || ''),
-      aiTag: detectTag(item.title || ''),
-      snippet: item.contentSnippet?.slice(0, 120),
+      isBreaking: isBreaking(stripHtml(item.title) || ''),
+      aiTag: detectTag(stripHtml(item.title) || ''),
+      snippet: stripHtml(item.contentSnippet)?.slice(0, 120),
     }))
   } catch {
     return []
@@ -63,8 +93,19 @@ async function fetchFeed(feed: typeof RSS_FEEDS[0]): Promise<NewsItem[]> {
 }
 
 export async function GET(req: Request) {
+  // Rate limit: 30 req/min per IP
+  const rl = rateLimit(req, 30, 60_000)
+  if (!rl.ok) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, {
+      status: 429,
+      headers: { 'Retry-After': String(rl.retryAfter) },
+    })
+  }
+
   const { searchParams } = new URL(req.url)
-  const category = searchParams.get('category') || 'ALL'
+  const rawCategory = searchParams.get('category') || 'ALL'
+  // Whitelist validation — reject unknown categories
+  const category = VALID_CATEGORIES.has(rawCategory) ? rawCategory : 'ALL'
   const cacheKey = `news_${category}`
 
   const cached = cache.get(cacheKey)

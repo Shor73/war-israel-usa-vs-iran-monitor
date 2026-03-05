@@ -28,6 +28,8 @@ export function Flag({ iso, size = 18, className = '', style }: FlagProps) {
 // Inline helper for use in HTML strings (MapLibre popups, innerHTML)
 // Returns a plain <img> tag string — no React needed
 export function flagImg(iso: string, size = 16): string {
+  // Strict ISO 3166-1 alpha-2 validation — prevents HTML injection via iso param
+  if (!/^[A-Za-z]{2}$/.test(iso)) return ''
   const code = iso.toLowerCase()
   const h = Math.round(size * 0.75)
   return `<img src="https://flagcdn.com/w20/${code}.png" srcset="https://flagcdn.com/w40/${code}.png 2x" width="${size}" height="${h}" alt="${iso.toUpperCase()}" style="vertical-align:middle;display:inline-block;border-radius:1px;margin-right:4px;" loading="lazy" />`

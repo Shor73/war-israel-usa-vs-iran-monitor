@@ -17,6 +17,10 @@ import { get as httpsGet } from 'https'
 
 const PORT = 3003
 
+// Optional shared secret — set RELAY_SECRET env var on both ends for auth
+// If not set, relay is open (acceptable for SSH-tunnel-only deployments)
+const RELAY_SECRET = process.env.RELAY_SECRET || null
+
 const OREF_LIVE_URL     = 'https://www.oref.org.il/WarningMessages/alert/alerts.json'
 const OREF_HISTORY_URL  = 'https://www.oref.org.il/Shared/Ajax/GetAlertsHistory.aspx?lang=en&fromDate={DATE}&toDate={DATE}&area=0'
 const OREF_HISTORY_ALT  = 'https://alerts-history.oref.org.il/Shared/Ajax/GetAlarmsHistory.aspx?lang=en&fromDate={DATE}&toDate={DATE}&area=0'
@@ -29,10 +33,27 @@ const OREF_HEADERS = {
   'Accept-Language': 'he-IL,he;q=0.9,en;q=0.8',
 }
 
+// Rate limiter — max 60 req/min per IP
+const rateLimitStore = new Map()
+function isRateLimited(ip) {
+  const now = Date.now()
+  const entry = rateLimitStore.get(ip) || { count: 0, resetAt: now + 60000 }
+  if (now > entry.resetAt) { entry.count = 0; entry.resetAt = now + 60000 }
+  entry.count++
+  rateLimitStore.set(ip, entry)
+  return entry.count > 60
+}
+// Clean up rate limit store every 5 minutes
+setInterval(() => {
+  const now = Date.now()
+  for (const [ip, e] of rateLimitStore) { if (now > e.resetAt) rateLimitStore.delete(ip) }
+}, 5 * 60 * 1000)
+
 function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
+  // Restrict to same server — not wildcard
+  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || 'http://localhost:3002')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   res.setHeader('Cache-Control', 'no-cache, no-store')
 }
 
@@ -71,12 +92,33 @@ function todayStr() {
 }
 
 const server = createServer((req, res) => {
+  const ip = req.socket.remoteAddress || 'unknown'
+
   // CORS preflight
   if (req.method === 'OPTIONS') {
     cors(res)
     res.writeHead(204)
     res.end()
     return
+  }
+
+  // Rate limiting
+  if (isRateLimited(ip)) {
+    cors(res)
+    res.writeHead(429, { 'Content-Type': 'application/json' })
+    res.end('{"error":"rate limit exceeded — max 60 req/min"}')
+    console.warn(`[${new Date().toISOString()}] RATE_LIMIT ${ip}`)
+    return
+  }
+
+  // Optional bearer token auth
+  if (RELAY_SECRET) {
+    const auth = req.headers['authorization'] || ''
+    if (auth !== `Bearer ${RELAY_SECRET}`) {
+      res.writeHead(401, { 'Content-Type': 'application/json' })
+      res.end('{"error":"unauthorized"}')
+      return
+    }
   }
 
   if (req.url === '/live') {

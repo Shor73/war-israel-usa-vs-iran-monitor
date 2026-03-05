@@ -57,6 +57,17 @@ export default function StatusBar() {
           <span style={{ color: '#c8d6e5' }}>ANGELO DI VEROLI</span>
           {' '}· IDEA BY{' '}
           <span style={{ color: '#c8d6e5' }}>DAVID DI TIVOLI</span>
+          {' '}·{' '}
+          <a
+            href="https://github.com/Shor73/war-israel-usa-vs-iran-monitor"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#00ff88', textDecoration: 'none' }}
+            onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+            onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+          >
+            GitHub
+          </a>
           {' '}· GEO DATA:{' '}
           <a
             href="https://github.com/koala73/worldmonitor"

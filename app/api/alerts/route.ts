@@ -8,8 +8,18 @@ const OREF_HISTORY_ALT_URL = 'https://alerts-history.oref.org.il/Shared/Ajax/Get
 // tzevaadom.co.il — Israeli community API, no geo-block, real-time OREF mirror
 const TZEVA_ADOM_API_URL = 'https://api.tzevaadom.co.il/notifications'
 // Optional: relay server running on Israeli home machine (set OREF_RELAY_URL env var)
-// e.g. OREF_RELAY_URL=https://abc123.loca.lt — run scripts/oref-relay.mjs on your Israeli machine
-const RELAY_URL = process.env.OREF_RELAY_URL?.replace(/\/$/, '') || null
+// SECURITY: must be HTTPS and not a private/loopback IP (SSRF prevention)
+function validateRelayUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:') return false
+    const h = parsed.hostname
+    if (/^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|::1)/i.test(h)) return false
+    return true
+  } catch { return false }
+}
+const _rawRelay = process.env.OREF_RELAY_URL?.replace(/\/$/, '') || null
+const RELAY_URL = _rawRelay && validateRelayUrl(_rawRelay) ? _rawRelay : null
 
 // Cache
 let alertCache: { alerts: OrefAlert[]; history: OrefHistoryItem[]; ts: number } | null = null
