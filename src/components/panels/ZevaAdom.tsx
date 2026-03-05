@@ -173,10 +173,33 @@ function playSiren(audioCtx: AudioContext, muted: boolean): (() => void) {
 const LS_HISTORY_KEY = 'warops_alert_history_v1'
 const LS_STATS_KEY = 'warops_alert_stats_v1'
 
+// Validate shape + block HTML injection before trusting localStorage data
+function isValidHistoryItem(obj: unknown): obj is OrefHistoryItem {
+  if (!obj || typeof obj !== 'object') return false
+  const o = obj as Record<string, unknown>
+  const noHtml = (s: unknown) => typeof s === 'string' && !/<[^>]*>/.test(s)
+  return (
+    noHtml(o.alertDate) && (o.alertDate as string).length < 50 &&
+    noHtml(o.title)     && (o.title as string).length < 200 &&
+    noHtml(o.data)      && (o.data as string).length < 200 &&
+    noHtml(o.id)        && (o.id as string).length < 50
+  )
+}
+
 function loadCached<T>(key: string): T | null {
   try {
     const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null
-    return raw ? (JSON.parse(raw) as T) : null
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (key === LS_HISTORY_KEY) {
+      if (!Array.isArray(parsed)) return null
+      return parsed.filter(isValidHistoryItem).slice(0, 200) as T
+    }
+    if (key === LS_STATS_KEY) {
+      if (!parsed || typeof parsed !== 'object' || typeof parsed.total !== 'number') return null
+      return parsed as T
+    }
+    return null
   } catch { return null }
 }
 

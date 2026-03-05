@@ -33,7 +33,16 @@ Third wave launch likely within 18-24 hours. Back-channel offers de-escalation p
 
 CLASSIFICATION: SECRET//NOFORN | SOURCES: OSINT aggregation, open-source analysis only`
 
-export async function GET() {
+export async function GET(req: Request) {
+  // Rate limit: max 10 req/hour per IP — each request may call Groq API
+  const { rateLimit } = await import('@/lib/rate-limit')
+  const rl = rateLimit(req, 10, 60 * 60_000)
+  if (!rl.ok) {
+    return NextResponse.json({ brief: FALLBACK_BRIEF }, {
+      headers: { 'Retry-After': String(rl.retryAfter) },
+    })
+  }
+
   if (cache && Date.now() - cache.ts < TTL) {
     return NextResponse.json({ brief: cache.brief })
   }

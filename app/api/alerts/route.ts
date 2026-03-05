@@ -252,9 +252,33 @@ function buildStats(history: OrefHistoryItem[]) {
   return { total: history.length, byRegion, byThreat, byType }
 }
 
+const VALID_MODES = new Set(['live', 'history', 'stats'])
+
+// Safe JSON parse with schema validation for OREF response
+function safeParseOrefRaw(text: string): Record<string, unknown> | null {
+  try {
+    const raw = JSON.parse(text)
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+    if (!Array.isArray(raw.data)) return null
+    return raw as Record<string, unknown>
+  } catch { return null }
+}
+
 export async function GET(req: Request) {
+  // Rate limit: 60 req/min per IP (live alerts poll every 10s)
+  const { rateLimit } = await import('@/lib/rate-limit')
+  const rl = rateLimit(req, 60, 60_000)
+  if (!rl.ok) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, {
+      status: 429,
+      headers: { 'Retry-After': String(rl.retryAfter) },
+    })
+  }
+
   const { searchParams } = new URL(req.url)
-  const mode = searchParams.get('mode') // 'live' | 'history' | 'stats'
+  const rawMode = searchParams.get('mode')
+  // Whitelist: only known modes, default to 'live'
+  const mode = rawMode && VALID_MODES.has(rawMode) ? rawMode : 'live'
 
   if (mode === 'history' || mode === 'stats') {
     if (!alertCache || Date.now() - alertCache.ts > HISTORY_TTL) {
@@ -304,10 +328,11 @@ export async function GET(req: Request) {
         if (!text || text.trim() === '' || text.trim() === '[]' || text.trim() === '\r\n') {
           relayResponse = { active: null, source: 'OREF_RELAY' }
         } else {
-          const raw = JSON.parse(text)
-          relayResponse = (!raw || !raw.data || raw.data.length === 0)
+          const raw = safeParseOrefRaw(text)
+          const rawData = raw?.data as string[] | undefined
+          relayResponse = (!raw || !rawData || rawData.length === 0)
             ? { active: null, source: 'OREF_RELAY' }
-            : { active: parseOrefResponse(raw), source: 'OREF_RELAY' }
+            : { active: parseOrefResponse(raw as Parameters<typeof parseOrefResponse>[0]), source: 'OREF_RELAY' }
         }
         relayLiveCache = { response: relayResponse, ts: Date.now() }
         return NextResponse.json(relayResponse)

@@ -2,11 +2,12 @@ import type { NextConfig } from "next";
 
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-eval'",           // MapLibre GL requires unsafe-eval for WASM
+  "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:",  // MapLibre GL: WASM + dynamic workers
+  "worker-src blob: 'self'",                                  // MapLibre GL Web Workers (blob: URLs)
   "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
-  "img-src 'self' https: data:",               // flagcdn.com + map tiles
-  "font-src 'self' fonts.gstatic.com fonts.googleapis.com",
-  "connect-src 'self' https: wss:",            // API routes + map tiles + SSE
+  "img-src 'self' https: data: blob:",                       // flagcdn.com + map tiles + MapLibre sprites
+  "font-src 'self' fonts.gstatic.com fonts.googleapis.com data:",
+  "connect-src 'self' https: wss: blob:",                    // API routes + map tiles + SSE + MapLibre
   "frame-src 'self' https://www.youtube.com https://youtube.com",
   "media-src 'self' https://www.youtube.com",
   "object-src 'none'",
