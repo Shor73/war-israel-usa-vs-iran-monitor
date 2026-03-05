@@ -1,0 +1,241 @@
+@import "tailwindcss";
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
+:root {
+  --bg-primary: #0a0e14;
+  --bg-secondary: #111820;
+  --bg-panel: #151d28;
+  --bg-panel-header: #1a2332;
+  --border-panel: #1e2d3d;
+  --border-active: #2a4a6b;
+  --text-primary: #c8d6e5;
+  --text-secondary: #7f8c9b;
+  --text-accent: #00ff88;
+  --threat-critical: #ff2d2d;
+  --threat-high: #ff6b35;
+  --threat-medium: #ffc107;
+  --threat-low: #00e676;
+  --threat-info: #2196f3;
+  --cia: #1a73e8;
+  --mossad: #ffd700;
+  --aman: #00c853;
+  --osint: #ab47bc;
+  --irgc: #ff5722;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* CRT scanlines overlay */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.font-military { font-family: 'Share Tech Mono', monospace; }
+.font-mono-data { font-family: 'JetBrains Mono', monospace; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: #0a0e14; }
+::-webkit-scrollbar-thumb { background: #2a4a6b; border-radius: 2px; }
+
+/* Panel */
+.mil-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-panel);
+  position: relative;
+  overflow: hidden;
+}
+
+.mil-panel-header {
+  background: var(--bg-panel-header);
+  border-bottom: 1px solid var(--border-panel);
+  font-family: 'Share Tech Mono', monospace;
+  text-transform: uppercase;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: var(--text-accent);
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Animations */
+@keyframes threat-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@keyframes scan-line {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+@keyframes alert-flash {
+  0% { opacity: 1; }
+  100% { opacity: 0.15; }
+}
+@keyframes ticker-scroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-200%); }
+}
+@keyframes blink-cur {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.live-dot { animation: threat-pulse 1.5s ease-in-out infinite; }
+.critical-pulse { animation: alert-flash 0.4s ease-in-out infinite alternate; }
+.ticker-scroll { animation: ticker-scroll 90s linear infinite; white-space: nowrap; }
+.ticker-scroll:hover { animation-play-state: paused; }
+.cursor-blink { animation: blink-cur 1s step-end infinite; }
+
+/* SIGINT terminal */
+.sigint-terminal {
+  background: #020a04;
+  position: relative;
+  overflow: hidden;
+}
+.sigint-terminal::after {
+  content: '';
+  position: absolute;
+  top: -100%; left: 0; right: 0;
+  height: 60px;
+  background: linear-gradient(transparent, rgba(0,255,65,0.03), transparent);
+  animation: scan-line 5s linear infinite;
+  pointer-events: none;
+}
+
+/* Agency colors utility */
+.agency-cia   { color: var(--cia);    border-color: var(--cia); }
+.agency-mossad{ color: var(--mossad); border-color: var(--mossad); }
+.agency-aman  { color: var(--aman);   border-color: var(--aman); }
+.agency-osint { color: var(--osint);  border-color: var(--osint); }
+.agency-irgc  { color: var(--irgc);   border-color: var(--irgc); }
+
+/* Main grid — bottom row reduced to tab-bar only (34px); panels open as full overlay */
+.dashboard-grid {
+  display: grid;
+  height: 100vh;
+  width: 100vw;
+  grid-template-rows: 52px 28px 1fr 34px 18px;
+  grid-template-columns: 270px 1fr 270px;
+  gap: 2px;
+  background: var(--bg-secondary);
+  padding: 2px;
+  overflow: hidden;
+}
+
+/* ── Panel Expand Overlay ─────────────────────────────────── */
+@keyframes panel-expand-in {
+  from { opacity: 0; transform: scaleY(0.94) translateY(12px); transform-origin: bottom center; }
+  to   { opacity: 1; transform: scaleY(1)    translateY(0);    transform-origin: bottom center; }
+}
+@keyframes panel-expand-out {
+  from { opacity: 1; transform: scaleY(1)    translateY(0);    transform-origin: bottom center; }
+  to   { opacity: 0; transform: scaleY(0.94) translateY(12px); transform-origin: bottom center; }
+}
+@keyframes backdrop-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+
+.panel-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 48;
+  background: rgba(6, 12, 18, 0.88);
+  backdrop-filter: blur(3px);
+  animation: backdrop-in 250ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.panel-overlay-backdrop.closing {
+  animation: backdrop-out 200ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.panel-overlay-container {
+  position: fixed;
+  /* sits just below header (52px) + ticker (28px) + 2px padding = 82px */
+  top: 82px;
+  left: 2px;
+  right: 2px;
+  /* reaches just above status bar (18px) + bottom tab bar (34px) + 2px gaps = 56px from bottom */
+  bottom: 56px;
+  z-index: 49;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-active);
+  box-shadow: 0 0 40px rgba(0, 255, 136, 0.08), 0 -4px 24px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  animation: panel-expand-in 300ms cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+}
+.panel-overlay-container.closing {
+  animation: panel-expand-out 200ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.panel-overlay-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border-panel);
+  background: #0d1520;
+  height: 32px;
+  gap: 0;
+}
+
+.panel-overlay-tab {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  padding: 0 16px;
+  height: 100%;
+  border: none;
+  border-right: 1px solid var(--border-panel);
+  background: transparent;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  transition: background 150ms, color 150ms;
+  white-space: nowrap;
+}
+.panel-overlay-tab:hover { background: rgba(255,255,255,0.03); }
+
+.panel-overlay-close {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  padding: 0 14px;
+  height: 100%;
+  border: none;
+  border-left: 1px solid var(--border-panel);
+  background: transparent;
+  color: #4a6a7a;
+  cursor: pointer;
+  margin-left: auto;
+  letter-spacing: 0.06em;
+  transition: color 150ms, background 150ms;
+  flex-shrink: 0;
+}
+.panel-overlay-close:hover { color: #ff6b35; background: rgba(255, 107, 53, 0.06); }
+
+.panel-overlay-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
