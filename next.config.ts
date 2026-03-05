@@ -27,6 +27,8 @@ const nextConfig: NextConfig = {
           { key: 'Referrer-Policy',           value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy',        value: 'camera=(), microphone=(), geolocation=(self), payment=()' },
           { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+          { key: 'Cross-Origin-Opener-Policy',   value: 'same-origin' },
+          { key: 'Cross-Origin-Resource-Policy',  value: 'cross-origin' },  // cross-origin needed for flagcdn.com images + map tiles
           { key: 'Content-Security-Policy',   value: CSP },
         ],
       },

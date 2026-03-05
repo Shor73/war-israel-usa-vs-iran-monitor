@@ -8,13 +8,20 @@ const OREF_HISTORY_ALT_URL = 'https://alerts-history.oref.org.il/Shared/Ajax/Get
 // tzevaadom.co.il — Israeli community API, no geo-block, real-time OREF mirror
 const TZEVA_ADOM_API_URL = 'https://api.tzevaadom.co.il/notifications'
 // Optional: relay server running on Israeli home machine (set OREF_RELAY_URL env var)
-// SECURITY: must be HTTPS and not a private/loopback IP (SSRF prevention)
+// This is a server-side env var set by the admin, NOT user-supplied input.
+// SSH tunnel to localhost:3003 is the primary deployment pattern, so we allow
+// localhost/127.0.0.1 here. For public tunnels, HTTPS is required.
 function validateRelayUrl(url: string): boolean {
   try {
     const parsed = new URL(url)
-    if (parsed.protocol !== 'https:') return false
     const h = parsed.hostname
-    if (/^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|::1)/i.test(h)) return false
+    // Allow localhost / 127.0.0.1 (SSH tunnel pattern — admin-configured, not user input)
+    if (h === 'localhost' || h === '127.0.0.1' || h === '::1') {
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    }
+    // Public URLs must be HTTPS — block private networks (SSRF prevention)
+    if (parsed.protocol !== 'https:') return false
+    if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|fe80:)/i.test(h)) return false
     return true
   } catch { return false }
 }

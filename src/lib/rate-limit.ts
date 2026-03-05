@@ -69,16 +69,3 @@ export function isValidIso2(code: string): boolean {
   return /^[A-Za-z]{2}$/.test(code)
 }
 
-// Validate OREF_RELAY_URL — must be https, no private IPs
-export function isValidRelayUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url)
-    if (parsed.protocol !== 'https:') return false
-    const host = parsed.hostname
-    // Block private/loopback/link-local IP ranges
-    if (/^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|::1|fe80:)/i.test(host)) return false
-    return true
-  } catch {
-    return false
-  }
-}
