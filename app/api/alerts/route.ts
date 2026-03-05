@@ -132,9 +132,10 @@ function enrichArea(nameHe: string): AlertArea {
 }
 
 function parseOrefResponse(raw: { id: number; cat: number; title: string; data: string[] }): OrefAlert {
-  const areas = (raw.data || []).map(enrichArea)
+  // Cap at 500 areas — a real alert has at most ~50 cities; prevents abuse
+  const areas = (raw.data || []).slice(0, 500).map(enrichArea)
   const primaryThreat: ThreatSource = areas[0]?.threatSource || 'UNKNOWN'
-  const minTime = Math.min(...areas.map(a => a.timeToImpact), 999)
+  const minTime = areas.reduce((min, a) => Math.min(min, a.timeToImpact), 999)
   return {
     id: String(raw.id || Date.now()),
     cat: raw.cat || 1,

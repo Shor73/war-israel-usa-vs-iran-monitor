@@ -16,6 +16,7 @@ const CSP = [
 ].join('; ')
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   async headers() {
     return [
       {

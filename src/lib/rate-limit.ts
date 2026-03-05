@@ -4,6 +4,10 @@
 interface Bucket { count: number; resetAt: number }
 const store = new Map<string, Bucket>()
 
+// Hard cap on store size — prevents OOM via X-Forwarded-For spoofing attack
+// 10K unique IP:path combos is more than enough for a single-instance dashboard
+const MAX_STORE_SIZE = 10_000
+
 // Clean up old entries every 10 minutes to avoid memory leak
 setInterval(() => {
   const now = Date.now()
@@ -27,6 +31,10 @@ export function rateLimit(
   const bucket = store.get(key)
 
   if (!bucket || now > bucket.resetAt) {
+    // If store is at capacity, reject new IPs (assumes spoofing attack)
+    if (!bucket && store.size >= MAX_STORE_SIZE) {
+      return { ok: false, retryAfter: 60 }
+    }
     store.set(key, { count: 1, resetAt: now + windowMs })
     return { ok: true, retryAfter: 0 }
   }

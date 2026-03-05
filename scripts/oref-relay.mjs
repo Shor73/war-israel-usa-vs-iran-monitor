@@ -14,6 +14,7 @@
 
 import { createServer } from 'http'
 import { get as httpsGet } from 'https'
+import { timingSafeEqual } from 'crypto'
 
 const PORT = 3003
 
@@ -111,10 +112,14 @@ const server = createServer((req, res) => {
     return
   }
 
-  // Optional bearer token auth
+  // Optional bearer token auth — timing-safe comparison to prevent character extraction
   if (RELAY_SECRET) {
     const auth = req.headers['authorization'] || ''
-    if (auth !== `Bearer ${RELAY_SECRET}`) {
+    const expected = `Bearer ${RELAY_SECRET}`
+    const authBuf = Buffer.from(auth)
+    const expectedBuf = Buffer.from(expected)
+    const valid = authBuf.length === expectedBuf.length && timingSafeEqual(authBuf, expectedBuf)
+    if (!valid) {
       res.writeHead(401, { 'Content-Type': 'application/json' })
       res.end('{"error":"unauthorized"}')
       return
